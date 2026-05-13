@@ -1,20 +1,16 @@
 <?php
 
 /**
- * This file is part of the Propel package.
+ * MIT License. This file is part of the Propel package.
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
- *
- * @license MIT License
  */
 
 namespace Propel\Generator\Model;
 
-use Propel\Generator\Exception\EngineException;
-
 /**
  * A <code>NameGeneratorInterface</code> implementation for table-specific
- * constraints.  Conforms to the maximum column name length for the
+ * constraints. Conforms to the maximum column name length for the
  * type of database in use.
  *
  * @author Hans Lellelid <hans@xmpl.org> (Propel)
@@ -25,8 +21,10 @@ class ConstraintNameGenerator implements NameGeneratorInterface
 {
     /**
      * Conditional compilation flag.
+     *
+     * @var bool
      */
-    const DEBUG = false;
+    public const DEBUG = false;
 
     /**
      * First element of <code>inputs</code> should be of type {@link Database}, second
@@ -36,24 +34,22 @@ class ConstraintNameGenerator implements NameGeneratorInterface
      * of this constraint.
      *
      * @see NameGenerator
-     * @param  array           $inputs An array of input parameters
+     *
+     * @param array $inputs An array of input parameters
+     *
      * @return string
-     * @throws EngineException
      */
-    public function generateName($inputs)
+    public function generateName(array $inputs): string
     {
-        $db            = $inputs[0];
-        $name          = $inputs[1];
-        $namePostfix   = $inputs[2];
-        $constraintNbr = (string) $inputs[3];
+        /** @var \Propel\Generator\Model\Database $db */
+        $db = $inputs[0];
+        $name = $inputs[1];
+        $namePostfix = $inputs[2];
+        $constraintNbr = (string)$inputs[3];
 
         // Calculate maximum RDBMS-specific column character limit.
-        try {
-            $maxColumnNameLength = (int) $db->getMaxColumnNameLength();
-            $maxBodyLength = ($maxColumnNameLength - strlen($namePostfix) - strlen($constraintNbr) - 2);
-        } catch (EngineException $e) {
-            throw $e;
-        }
+        $maxColumnNameLength = $db->getMaxColumnNameLength();
+        $maxBodyLength = ($maxColumnNameLength - strlen($namePostfix) - strlen($constraintNbr) - 2);
 
         // Do any necessary trimming.
         if ($maxBodyLength !== -1 && strlen($name) > $maxBodyLength) {

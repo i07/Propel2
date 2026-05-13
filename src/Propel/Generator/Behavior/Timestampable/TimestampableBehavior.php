@@ -1,15 +1,16 @@
 <?php
 
 /**
- * This file is part of the Propel package.
+ * MIT License. This file is part of the Propel package.
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
- *
- * @license MIT License
  */
 
 namespace Propel\Generator\Behavior\Timestampable;
 
+use DateTime;
+use Propel\Generator\Builder\Om\AbstractOMBuilder;
+use Propel\Generator\Builder\Om\ObjectBuilder;
 use Propel\Generator\Model\Behavior;
 
 /**
@@ -20,6 +21,9 @@ use Propel\Generator\Model\Behavior;
  */
 class TimestampableBehavior extends Behavior
 {
+    /**
+     * @var array<string, mixed>
+     */
     protected $parameters = [
         'create_column' => 'created_at',
         'update_column' => 'updated_at',
@@ -27,34 +31,41 @@ class TimestampableBehavior extends Behavior
         'disable_updated_at' => 'false',
     ];
 
-
-    protected function withUpdatedAt()
+    /**
+     * @return bool
+     */
+    protected function withUpdatedAt(): bool
     {
         return !$this->booleanValue($this->getParameter('disable_updated_at'));
     }
 
-    protected function withCreatedAt()
+    /**
+     * @return bool
+     */
+    protected function withCreatedAt(): bool
     {
         return !$this->booleanValue($this->getParameter('disable_created_at'));
     }
 
     /**
      * Add the create_column and update_columns to the current table
+     *
+     * @return void
      */
-    public function modifyTable()
+    public function modifyTable(): void
     {
         $table = $this->getTable();
 
         if ($this->withCreatedAt() && !$table->hasColumn($this->getParameter('create_column'))) {
             $table->addColumn([
                 'name' => $this->getParameter('create_column'),
-                'type' => 'TIMESTAMP'
+                'type' => 'TIMESTAMP',
             ]);
         }
         if ($this->withUpdatedAt() && !$table->hasColumn($this->getParameter('update_column'))) {
             $table->addColumn([
                 'name' => $this->getParameter('update_column'),
-                'type' => 'TIMESTAMP'
+                'type' => 'TIMESTAMP',
             ]);
         }
     }
@@ -62,15 +73,22 @@ class TimestampableBehavior extends Behavior
     /**
      * Get the setter of one of the columns of the behavior
      *
-     * @param  string $column One of the behavior columns, 'create_column' or 'update_column'
+     * @param string $column One of the behavior columns, 'create_column' or 'update_column'
+     *
      * @return string The related setter, 'setCreatedOn' or 'setUpdatedOn'
      */
-    protected function getColumnSetter($column)
+    protected function getColumnSetter(string $column): string
     {
         return 'set' . $this->getColumnForParameter($column)->getPhpName();
     }
 
-    protected function getColumnConstant($columnName, $builder)
+    /**
+     * @param string $columnName
+     * @param \Propel\Generator\Builder\Om\AbstractOMBuilder $builder
+     *
+     * @return string
+     */
+    protected function getColumnConstant(string $columnName, AbstractOMBuilder $builder): string
     {
         return $builder->getColumnConstant($this->getColumnForParameter($columnName));
     }
@@ -78,13 +96,25 @@ class TimestampableBehavior extends Behavior
     /**
      * Add code in ObjectBuilder::preUpdate
      *
+     * @param \Propel\Generator\Builder\Om\AbstractOMBuilder $builder
+     *
      * @return string The code to put at the hook
      */
-    public function preUpdate($builder)
+    public function preUpdate(AbstractOMBuilder $builder): string
     {
         if ($this->withUpdatedAt()) {
-            return "if (\$this->isModified() && !\$this->isColumnModified(" . $this->getColumnConstant('update_column', $builder) . ")) {
-    \$this->" . $this->getColumnSetter('update_column') . "(\\Propel\\Runtime\\Util\\PropelDateTime::createHighPrecision());
+            $updateColumn = $this->getTable()->getColumn($this->getParameter('update_column'));
+
+            $dateTimeClass = $builder instanceof ObjectBuilder
+                ? $builder->getDateTimeClass($updateColumn)
+                : DateTime::class;
+
+            $valueSource = strtoupper($updateColumn->getType()) === 'INTEGER'
+                ? 'time()'
+                : "PropelDateTime::createHighPrecision(null, '$dateTimeClass')";
+
+            return 'if ($this->isModified() && !$this->isColumnModified(' . $this->getColumnConstant('update_column', $builder) . ")) {
+    \$this->" . $this->getColumnSetter('update_column') . "({$valueSource});
 }";
         }
 
@@ -94,30 +124,57 @@ class TimestampableBehavior extends Behavior
     /**
      * Add code in ObjectBuilder::preInsert
      *
+     * @param \Propel\Generator\Builder\Om\AbstractOMBuilder $builder
+     *
      * @return string The code to put at the hook
      */
-    public function preInsert($builder)
+    public function preInsert(AbstractOMBuilder $builder): string
     {
-        $script = '';
+        $script = '$mtime = microtime(true);';
 
         if ($this->withCreatedAt()) {
+            $createColumn = $this->getTable()->getColumn($this->getParameter('create_column'));
+
+            $dateTimeClass = $builder instanceof ObjectBuilder
+                ? $builder->getDateTimeClass($createColumn)
+                : DateTime::class;
+
+            $valueSource = strtoupper($createColumn->getType()) === 'INTEGER'
+                ? '(int)$mtime'
+                : "PropelDateTime::createHighPrecision(PropelDateTime::formatMicrotime(\$mtime), '$dateTimeClass')";
+
             $script .= "
 if (!\$this->isColumnModified(" . $this->getColumnConstant('create_column', $builder) . ")) {
-    \$this->" . $this->getColumnSetter('create_column') . "(\\Propel\\Runtime\\Util\\PropelDateTime::createHighPrecision());
+    \$this->" . $this->getColumnSetter('create_column') . "({$valueSource});
 }";
         }
 
         if ($this->withUpdatedAt()) {
+            $updateColumn = $this->getTable()->getColumn($this->getParameter('update_column'));
+
+            $dateTimeClass = $builder instanceof ObjectBuilder
+                ? $builder->getDateTimeClass($updateColumn)
+                : DateTime::class;
+
+            $valueSource = strtoupper($updateColumn->getType()) === 'INTEGER'
+                ? '(int)$mtime'
+                : "PropelDateTime::createHighPrecision(PropelDateTime::formatMicrotime(\$mtime), '$dateTimeClass')";
+
             $script .= "
 if (!\$this->isColumnModified(" . $this->getColumnConstant('update_column', $builder) . ")) {
-    \$this->" . $this->getColumnSetter('update_column') . "(\\Propel\\Runtime\\Util\\PropelDateTime::createHighPrecision());
+    \$this->" . $this->getColumnSetter('update_column') . "({$valueSource});
 }";
         }
 
         return $script;
     }
 
-    public function objectMethods($builder)
+    /**
+     * @param \Propel\Generator\Builder\Om\AbstractOMBuilder $builder
+     *
+     * @return string
+     */
+    public function objectMethods(AbstractOMBuilder $builder): string
     {
         if (!$this->withUpdatedAt()) {
             return '';
@@ -127,7 +184,7 @@ if (!\$this->isColumnModified(" . $this->getColumnConstant('update_column', $bui
 /**
  * Mark the current object so that the update date doesn't get updated during next save
  *
- * @return     \$this|" . $builder->getObjectClassName() . " The current object (for fluent API support)
+ * @return \$this The current object (for fluent API support)
  */
 public function keepUpdateDateUnchanged()
 {
@@ -138,10 +195,13 @@ public function keepUpdateDateUnchanged()
 ";
     }
 
-    public function queryMethods($builder)
+    /**
+     * @param \Propel\Generator\Builder\Om\AbstractOMBuilder $builder
+     *
+     * @return string
+     */
+    public function queryMethods(AbstractOMBuilder $builder): string
     {
-        $queryClassName = $builder->getQueryClassName();
-
         $script = '';
 
         if ($this->withUpdatedAt()) {
@@ -150,33 +210,39 @@ public function keepUpdateDateUnchanged()
 /**
  * Filter by the latest updated
  *
- * @param      int \$nbDays Maximum age of the latest update in days
+ * @param int \$nbDays Maximum age of the latest update in days
  *
- * @return     \$this|$queryClassName The current query, for fluid interface
+ * @return \$this The current query, for fluid interface
  */
 public function recentlyUpdated(\$nbDays = 7)
 {
-    return \$this->addUsingAlias($updateColumnConstant, time() - \$nbDays * 24 * 60 * 60, Criteria::GREATER_EQUAL);
+    \$this->addUsingAlias($updateColumnConstant, time() - \$nbDays * 24 * 60 * 60, Criteria::GREATER_EQUAL);
+
+    return \$this;
 }
 
 /**
  * Order by update date desc
  *
- * @return     \$this|$queryClassName The current query, for fluid interface
+ * @return \$this The current query, for fluid interface
  */
 public function lastUpdatedFirst()
 {
-    return \$this->addDescendingOrderByColumn($updateColumnConstant);
+    \$this->addDescendingOrderByColumn($updateColumnConstant);
+
+    return \$this;
 }
 
 /**
  * Order by update date asc
  *
- * @return     \$this|$queryClassName The current query, for fluid interface
+ * @return \$this The current query, for fluid interface
  */
 public function firstUpdatedFirst()
 {
-    return \$this->addAscendingOrderByColumn($updateColumnConstant);
+    \$this->addAscendingOrderByColumn($updateColumnConstant);
+
+    return \$this;
 }
 ";
         }
@@ -187,33 +253,39 @@ public function firstUpdatedFirst()
 /**
  * Order by create date desc
  *
- * @return     \$this|$queryClassName The current query, for fluid interface
+ * @return \$this The current query, for fluid interface
  */
 public function lastCreatedFirst()
 {
-    return \$this->addDescendingOrderByColumn($createColumnConstant);
+    \$this->addDescendingOrderByColumn($createColumnConstant);
+
+    return \$this;
 }
 
 /**
  * Filter by the latest created
  *
- * @param      int \$nbDays Maximum age of in days
+ * @param int \$nbDays Maximum age of in days
  *
- * @return     \$this|$queryClassName The current query, for fluid interface
+ * @return \$this The current query, for fluid interface
  */
 public function recentlyCreated(\$nbDays = 7)
 {
-    return \$this->addUsingAlias($createColumnConstant, time() - \$nbDays * 24 * 60 * 60, Criteria::GREATER_EQUAL);
+    \$this->addUsingAlias($createColumnConstant, time() - \$nbDays * 24 * 60 * 60, Criteria::GREATER_EQUAL);
+
+    return \$this;
 }
 
 /**
  * Order by create date asc
  *
- * @return     \$this|$queryClassName The current query, for fluid interface
+ * @return \$this The current query, for fluid interface
  */
 public function firstCreatedFirst()
 {
-    return \$this->addAscendingOrderByColumn($createColumnConstant);
+    \$this->addAscendingOrderByColumn($createColumnConstant);
+
+    return \$this;
 }
 ";
         }

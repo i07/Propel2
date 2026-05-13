@@ -1,174 +1,197 @@
 <?php
 
 /**
- * This file is part of the Propel package.
+ * MIT License. This file is part of the Propel package.
  * For the full copyright and license information, please view the LICENSE
  * file that was distributed with this source code.
- *
- * @license MIT License
  */
 
 namespace Propel\Runtime\Connection;
 
+use PDO;
+
 /**
- * Interface for Propel Connection object.
- * Based on the PDOStatement interface.
- * @see http://www.php.net/manual/en/class.pdostatement.php
+ * Interface for Propel Statement object.
+ * Based on the PDOStatement class.
  *
- * @author Francois Zaninotto
+ * @see http://php.net/manual/en/book.pdo.php
+ *
+ * @author Aleksandr Bezpiatov
  */
 interface StatementInterface
 {
     /**
-     * Binds a parameter to the specified variable name.
-     *
-     * Binds a PHP variable to a corresponding named or question mark placeholder in the
-     * SQL statement that was use to prepare the statement. Unlike PDOStatement->bindValue(),
-     * the variable is bound as a reference and will only be evaluated at the time
-     * that PDOStatement->execute() is called.
-     *
-     * Most parameters are input parameters, that is, parameters that are
-     * used in a read-only fashion to build up the query. Some drivers support the invocation
-     * of stored procedures that return data as output parameters, and some also as input/output
-     * parameters that both send in data and are updated to receive it.
-     *
-     * @param mixed $column Parameter identifier. For a prepared statement using named placeholders,
-     *                      this will be a parameter name of the form :name. For a prepared statement
-     *                      using question mark placeholders, this will be the 1-indexed position of the parameter
-     *
-     * @param mixed $variable Name of the PHP variable to bind to the SQL statement parameter.
-     *
-     * @param  integer $type Explicit data type for the parameter using the PDO::PARAM_* constants. To return
-     *                       an INOUT parameter from a stored procedure, use the bitwise OR operator to set the
-     *                       PDO::PARAM_INPUT_OUTPUT bits for the data_type parameter.
-     * @return boolean Returns TRUE on success or FALSE on failure.
-     */
-    public function bindParam($column, &$variable, $type = null);
-
-    /**
-     * Binds a value to a parameter.
-     *
-     * Binds a value to a corresponding named or question mark placeholder
-     * in the SQL statement that was used to prepare the statement.
-     *
-     * @param mixed $param Parameter identifier. For a prepared statement using named placeholders,
-     *                     this will be a parameter name of the form :name. For a prepared statement
-     *                     using question mark placeholders, this will be the 1-indexed position of the parameter
-     *
-     * @param mixed   $value The value to bind to the parameter.
-     * @param integer $type  Explicit data type for the parameter using the PDO::PARAM_* constants.
-     *
-     * @return boolean Returns TRUE on success or FALSE on failure.
-     */
-    public function bindValue($param, $value, $type = null);
-
-    /**
-     * Closes the cursor, enabling the statement to be executed again.
-     *
-     * closeCursor() frees up the connection to the server so that other SQL
-     * statements may be issued, but leaves the statement in a state that enables
-     * it to be executed again.
-     *
-     * This method is useful for database drivers that do not support executing
-     * a PDOStatement object when a previously executed PDOStatement object still
-     * has unfetched rows. If your database driver suffers from this limitation,
-     * the problem may manifest itself in an out-of-sequence error.
-     *
-     * @return boolean Returns TRUE on success or FALSE on failure.
-     */
-    public function closeCursor();
-
-    /**
-     * Returns the number of columns in the result set.
-     *
-     * Use columnCount() to return the number of columns in the result set
-     * represented by the Statement object.
-     *
-     * If the Statement object was returned from PDO::query(), the column count
-     * is immediately available.
-     *
-     * If the Statement object was returned from PDO::prepare(), an accurate
-     * column count will not be available until you invoke Statement::execute().
-     * Returns the number of columns in the result set
-     *
-     * @return integer Returns the number of columns in the result set represented
-     *                 by the PDOStatement object. If there is no result set,
-     *                 this method should return 0.
-     */
-    public function columnCount();
-
-    /**
      * Executes a prepared statement.
      *
-     * If the prepared statement included parameter markers, you must either:
-     *  - call PDOStatement->bindParam() to bind PHP variables to the parameter markers:
-     * bound variables pass their value as input and receive the output value,
-     * if any, of their associated parameter markers
-     * - or pass an array of input-only parameter values
+     * @param array|null $inputParameters
      *
-     *
-     * @param  array   $parameters An array of values with as many elements as there are
-     *                             bound parameters in the SQL statement being executed.
-     * @return boolean Returns TRUE on success or FALSE on failure.
+     * @return bool TRUE on success or FALSE on failure.
      */
-    public function execute($parameters = null);
+    public function execute(?array $inputParameters = null): bool;
 
     /**
      * Fetches the next row from a result set.
      *
-     * Fetches a row from a result set associated with a Statement object.
-     * The fetch_style parameter determines how the Connection returns the row.
-     *
-     * @param integer $fetchStyle        Controls how the next row will be returned to the caller.
-     * @param integer $cursorOrientation For a PDOStatement object representing a scrollable cursor,
-     *                                   This value determines which row will be returned to the caller.
-     * @param integer $cursorOffset      For a PDOStatement object representing a
-     *                                   scrollable cursor for which the cursor_orientation
-     *                                   parameter is set to PDO::FETCH_ORI_ABS, this value
-     *                                   specifies the absolute number of the row in the
-     *                                   result set that shall be fetched.
-     *
-     *                                   For a PDOStatement object representing a
-     *                                   scrollable cursor for which the cursor_orientation
-     *                                   parameter is set to PDO::FETCH_ORI_REL, this value
-     *                                   specifies the row to fetch relative to the cursor
-     *                                   position before PDOStatement::fetch() was called.
+     * @param int $fetchStyle Controls how the next row will be returned to the caller.
+     * @param int $cursorOrientation This value determines which row will be returned to the caller.
+     * @param int $cursorOffset
      *
      * @return mixed
      */
-    public function fetch($fetchStyle = 4);
+    public function fetch(int $fetchStyle = PDO::FETCH_BOTH, int $cursorOrientation = PDO::FETCH_ORI_NEXT, int $cursorOffset = 0);
 
     /**
-     * Returns an array containing all of the result set rows.
+     * Binds a parameter to the specified variable name.
      *
-     * @param  integer $fetchStyle Controls the contents of the returned array as documented in fetch()
-     * @return array
+     * @param mixed $parameter Parameter identifier.
+     * @param mixed $variable Name of the PHP variable to bind to the SQL statement parameter.
+     * @param int $dataType Explicit data type for the parameter using the PDO::PARAM_* constants.
+     * @param int|null $length Length of the data type.
+     * @param mixed $driverOptions
+     *
+     * @return bool TRUE on success or FALSE on failure.
      */
-    public function fetchAll($fetchStyle = 4);
+    public function bindParam($parameter, &$variable, int $dataType = PDO::PARAM_STR, ?int $length = null, $driverOptions = null): bool;
+
+    /**
+     * Bind a column to a PHP variable.
+     *
+     * @param mixed $column Number of the column (1-indexed) or name of the column in the result set.
+     * @param mixed $param Name of the PHP variable to which the column will be bound.
+     * @param int|null $type Data type of the parameter, specified by the PDO::PARAM_* constants.
+     * @param int|null $maxlen A hint for pre-allocation.
+     * @param mixed|null $driverdata Optional parameter(s) for the driver.
+     *
+     * @return bool TRUE on success or FALSE on failure.
+     */
+    public function bindColumn($column, &$param, ?int $type = null, ?int $maxlen = null, $driverdata = null): bool;
+
+    /**
+     * Binds a value to a parameter
+     *
+     * @param mixed $parameter Parameter identifier.
+     * @param mixed $value The value to bind to the parameter.
+     * @param int $dataType Explicit data type for the parameter using the PDO::PARAM_* constants.
+     *
+     * @return bool TRUE on success or FALSE on failure.
+     */
+    public function bindValue($parameter, $value, int $dataType = PDO::PARAM_STR): bool;
+
+    /**
+     * Returns the number of rows affected by the last SQL statement.
+     *
+     * @return int The number of rows.
+     */
+    public function rowCount(): int;
 
     /**
      * Returns a single column from the next row of a result set.
      *
-     * @param integer $columnIndex 0-indexed number of the column you wish to retrieve from the row. If no
-     *                             value is supplied, PDOStatement->fetchColumn()
-     *                             fetches the first column.
+     * @param int $columnIndex 0-indexed number of the column you wish to retrieve from the row.
      *
-     * @return string A single column in the next row of a result set.
+     * @return string|null Returns a single column from the next row of a result set or FALSE if there are no more rows.
      */
-    public function fetchColumn($columnIndex = 0);
+    public function fetchColumn(int $columnIndex = 0): ?string;
 
     /**
-     * Returns the number of rows affected by the last SQL statement
+     * Returns an array containing all of the result set rows.
      *
-     * rowCount() returns the number of rows affected by the last DELETE, INSERT, or UPDATE statement
-     * executed by the corresponding Statement object.
+     * @param int|null $fetchStyle Controls the contents of the returned array as documented in PDOStatement::fetch.
+     * @param mixed $fetchArgument This argument have a different meaning depending on the value of the fetch_style
+     * @param array $ctorArgs Arguments of custom class constructor when the fetch_style parameter is PDO::FETCH_CLASS.
      *
-     * If the last SQL statement executed by the associated Statement object was a SELECT statement,
-     * some databases may return the number of rows returned by that statement. However,
-     * this behaviour is not guaranteed for all databases and should not be
-     * relied on for portable applications.
-     *
-     * @return integer The number of rows.
+     * @return array returns an array containing all of the remaining rows in the result set.
      */
-    public function rowCount();
+    public function fetchAll(?int $fetchStyle = PDO::FETCH_BOTH, $fetchArgument = null, array $ctorArgs = []): array;
+
+    /**
+     * Fetches the next row and returns it as an object.
+     *
+     * @param class-string $className Name of the created class.
+     * @param array $ctorArgs Elements of this array are passed to the constructor.
+     *
+     * @return mixed
+     */
+    public function fetchObject(string $className, array $ctorArgs = []);
+
+    /**
+     * Fetch the SQLSTATE associated with the last operation on the statement handle.
+     *
+     * @return string
+     */
+    public function errorCode(): string;
+
+    /**
+     * Fetch extended error information associated with the last operation on the statement handle.
+     *
+     * @return array returns an array of error information about the last operation performed by this statement handle.
+     */
+    public function errorInfo(): array;
+
+    /**
+     * Set a statement attribute.
+     *
+     * @param int $attribute
+     * @param mixed $value
+     *
+     * @return bool TRUE on success or FALSE on failure.
+     */
+    public function setAttribute(int $attribute, $value): bool;
+
+    /**
+     * Retrieve a statement attribute.
+     *
+     * @param int $attribute
+     *
+     * @return mixed the attribute value.
+     */
+    public function getAttribute(int $attribute);
+
+    /**
+     * Returns the number of columns in the result set.
+     *
+     * @return int The number of columns in the result set represented by the StatementInterface object.
+     */
+    public function columnCount(): int;
+
+    /**
+     * Returns metadata for a column in a result set.
+     *
+     * @param int $column The 0-indexed column in the result set.
+     *
+     * @return array|false
+     */
+    public function getColumnMeta(int $column);
+
+    /**
+     * Set the default fetch mode for this statement.
+     *
+     * @param int $mode The fetch mode must be one of the PDO::FETCH_* constants.
+     * @param object|string|null $classNameObject Class name or object.
+     * @param array $ctorarfg Constructor arguments.
+     *
+     * @return bool TRUE on success or FALSE on failure.
+     */
+    public function setFetchMode(int $mode, $classNameObject = null, array $ctorarfg = []): bool;
+
+    /**
+     * Advances to the next rowset in a multi-rowset statement handle.
+     *
+     * @return bool TRUE on success or FALSE on failure.
+     */
+    public function nextRowset(): bool;
+
+    /**
+     * Closes the cursor, enabling the statement to be executed again.
+     *
+     * @return bool TRUE on success or FALSE on failure.
+     */
+    public function closeCursor(): bool;
+
+    /**
+     * Dump an SQL prepared command.
+     *
+     * @return void No value is returned.
+     */
+    public function debugDumpParams(): void;
 }
